@@ -1,0 +1,58 @@
+# ============================================================================
+# 服务配置（通过环境变量覆盖，见 docker-compose.yml）
+# ============================================================================
+
+APP_NAME: "ocr-api"
+# 服务监听地址与端口
+HOST: "0.0.0.0"
+PORT: 8000
+
+# 签名校验配置
+# 时间戳允许的最大偏差（秒），用于防重放
+SIGNATURE_CLOCK_SKEW: 300
+# Nonce（随机数）缓存时长（秒），与时钟偏差保持一致即可
+NONCE_TTL: 300
+# 是否启用签名校验（生产必须为 true；仅本地调试可临时关闭）
+ENABLE_SIGNATURE: true
+# 是否启用测试界面（本地测试用；生产务必设为 false）
+ENABLE_TEST_UI: true
+
+# 全局限流配置
+# 全局每秒允许的最大请求数（令牌桶）
+RATE_LIMIT_PER_SECOND: 2
+# 突发容量（令牌桶桶容量）
+RATE_LIMIT_BURST: 5
+
+# 图片上传限制（字节）
+MAX_UPLOAD_SIZE: 5242880
+# 允许的图片 MIME 类型
+ALLOWED_IMAGE_TYPES:
+  - "image/jpeg"
+  - "image/png"
+  - "image/webp"
+  - "image/bmp"
+# 允许的图片扩展名（白名单）
+ALLOWED_IMAGE_EXTS:
+  - ".jpg"
+  - ".jpeg"
+  - ".png"
+  - ".webp"
+  - ".bmp"
+
+# 密钥配置（对称密钥，AppID -> AppSecret 明文）
+# 生产环境务必通过环境变量 OCR_APP_SECRETS 注入，格式：
+#   appid1:secret1,appid2:secret2
+# 或使用下方文件方式。切勿硬编码明文到仓库！
+APP_SECRETS:
+  - appid: "demo"
+    secret: "CHANGE_ME_demo_secret_key_please_replace"
+
+# RapidOCR 参数（可选，保持默认即可）
+OCR_USE_GPU: false
+# 是否返回每个文字块的置信度
+OCR_RETURN_SCORE: true
+# 是否返回文本块所在行号/排序后的坐标信息
+OCR_RETURN_DETAILS: true
+
+# 日志级别
+LOG_LEVEL: "INFO"

@@ -1,0 +1,4 @@
+INFO:     127.0.0.1:54199 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54199 - "GET /test HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:54199 - "GET /test/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54207 - "POST /api/v1/test/ocr HTTP/1.1" 200 OK

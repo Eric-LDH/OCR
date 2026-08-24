@@ -1,0 +1,18 @@
+services:
+  ocr-api:
+    build: .
+    container_name: ocr-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # 密钥通过环境变量注入（appid:secret，多个用逗号分隔）
+      OCR_APP_SECRETS: "demo:CHANGE_ME_demo_secret_key_please_replace"
+      # 全局限流（每秒 2 次，突发 5）
+      OCR_RATE_LIMIT_PER_SECOND: "2"
+      OCR_RATE_LIMIT_BURST: "5"
+      # 图片上限 5MB
+      OCR_MAX_UPLOAD_SIZE: "5242880"
+      OCR_ENABLE_SIGNATURE: "true"
+    # 单副本时仅 1 个 worker，避免 Nonce 缓存与限流状态分散（后续扩展可用 Redis 支持多实例）
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

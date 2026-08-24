@@ -1,0 +1,6 @@
+INFO:     Started server process [11720]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+2026-08-24 21:08:56,181 [INFO] app.services.ocr_service: 正在加载 RapidOCR 模型，首次调用可能需要数秒...
+2026-08-24 21:08:57,806 [INFO] app.services.ocr_service: RapidOCR 模型加载完成

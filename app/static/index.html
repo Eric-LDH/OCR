@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OCR 识别测试</title>
+<style>
+  :root { --blue:#3b82f6; --green:#10b981; --red:#ef4444; --bg:#0f172a; --card:#1e293b; --line:#334155; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:"Microsoft YaHei",system-ui,sans-serif; background:var(--bg); color:#e2e8f0; min-height:100vh; }
+  header { background:var(--card); padding:18px 24px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:12px; }
+  header h1 { font-size:20px; font-weight:600; }
+  header .badge { background:var(--blue); color:#fff; font-size:12px; padding:3px 10px; border-radius:12px; }
+  main { max-width:980px; margin:28px auto; padding:0 20px; display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+  @media (max-width:820px){ main { grid-template-columns:1fr; } }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px; }
+  .card h2 { font-size:16px; margin-bottom:14px; color:#f8fafc; }
+  .drop { border:2px dashed var(--line); border-radius:12px; padding:34px 20px; text-align:center; cursor:pointer; transition:.2s; }
+  .drop:hover, .drop.drag { border-color:var(--blue); background:rgba(59,130,246,.06); }
+  .drop p { color:#94a3b8; margin-top:8px; font-size:14px; }
+  .drop img { max-width:100%; max-height:220px; border-radius:8px; margin-top:10px; }
+  button { background:var(--blue); color:#fff; border:none; padding:11px 22px; border-radius:9px; font-size:15px; cursor:pointer; width:100%; margin-top:16px; transition:.2s; }
+  button:hover { background:#2563eb; }
+  button:disabled { background:#475569; cursor:not-allowed; }
+  .result { margin-top:16px; white-space:pre-wrap; word-break:break-word; }
+  .result textarea { width:100%; height:150px; background:#0f172a; color:#e2e8f0; border:1px solid var(--line); border-radius:8px; padding:10px; font-size:14px; resize:vertical; font-family:Consolas,monospace; }
+  .meta { font-size:12px; color:#94a3b8; margin-top:8px; }
+  .box-list { margin-top:14px; }
+  .box-item { background:#0f172a; border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:8px; font-size:13px; }
+  .box-item .t { font-weight:600; }
+  .box-item .c { color:#94a3b8; font-size:12px; }
+  .status { display:flex; gap:10px; align-items:center; margin-top:14px; font-size:14px; }
+  .dot { width:10px; height:10px; border-radius:50%; background:#475569; }
+  .dot.ok { background:var(--green); } .dot.err { background:var(--red); } .dot.run { background:var(--blue); animation:blink 1s infinite; }
+  @keyframes blink { 50% { opacity:.3; } }
+  .hidden { display:none; }
+  #canvasWrap { position:relative; }
+  #boxCanvas { width:100%; border:1px solid var(--line); border-radius:8px; margin-top:10px; background:#000; }
+  input[type=file]{ display:none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>OCR 识别测试界面</h1>
+  <span class="badge">本地测试</span>
+</header>
+<main>
+  <!-- 左：上传与识别 -->
+  <div class="card">
+    <h2>① 选择图片</h2>
+    <div class="drop" id="drop">
+      <p>点击或拖拽图片到此处<br><small>支持 jpg / png / webp / bmp，≤5MB</small></p>
+      <img id="preview" class="hidden">
+    </div>
+    <input type="file" id="fileInput" accept="image/*">
+    <button id="btnRun" disabled>开始识别</button>
+    <div class="status" id="statusBox"><span class="dot" id="dot"></span><span id="statusText">请选择图片</span></div>
+  </div>
+
+  <!-- 右：结果与预览 -->
+  <div class="card">
+    <h2>② 识别结果</h2>
+    <div id="canvasWrap" class="hidden">
+      <canvas id="boxCanvas"></canvas>
+    </div>
+    <div class="result hidden" id="resultBox">
+      <textarea id="resultText" readonly placeholder="识别文本..."></textarea>
+    </div>
+    <div class="box-list hidden" id="boxList"></div>
+    <div class="meta hidden" id="metaBox"></div>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const drop = $('drop'), fileInput = $('fileInput'), preview = $('preview');
+const btnRun = $('btnRun'), dot = $('dot'), statusText = $('statusText');
+let currentFile = null, currentImg = null;
+
+function setStatus(text, state='') {
+  statusText.textContent = text;
+  dot.className = 'dot' + (state ? ' ' + state : '');
+}
+
+drop.addEventListener('click', () => fileInput.click());
+drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('drag'));
+drop.addEventListener('drop', e => {
+  e.preventDefault(); drop.classList.remove('drag');
+  if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadFile(fileInput.files[0]); });
+
+function loadFile(file) {
+  if (!/image\/(jpeg|png|webp|bmp)/.test(file.type)) { setStatus('不支持的图片类型', 'err'); return; }
+  if (file.size > 5*1024*1024) { setStatus('图片超过 5MB', 'err'); return; }
+  currentFile = file;
+  const url = URL.createObjectURL(file);
+  preview.src = url; preview.classList.remove('hidden');
+  setStatus('已选择：' + file.name, 'ok');
+  btnRun.disabled = false;
+}
+
+btnRun.addEventListener('click', async () => {
+  if (!currentFile) return;
+  setStatus('识别中...', 'run');
+  btnRun.disabled = true;
+  const fd = new FormData();
+  fd.append('file', currentFile);
+  // 用与当前页面同源的完整地址，避免 file:// 或代理下相对路径解析异常
+  const apiUrl = window.location.origin + '/api/v1/test/ocr';
+  try {
+    const resp = await fetch(apiUrl, { method:'POST', body: fd });
+    const json = await resp.json();
+    if (resp.ok && json.code === 200) renderResult(json.data, currentFile);
+    else { setStatus('接口错误：' + (json.message || resp.status), 'err'); clearResult(); }
+  } catch (e) {
+    let msg = e.message;
+    if (window.location.protocol === 'file:') {
+      msg = '请通过 http 地址访问本页面（当前是 file:// 打开），例如 http://127.0.0.1:8000/test';
+    }
+    setStatus('网络错误：' + msg + '（目标 ' + apiUrl + '）', 'err'); clearResult();
+  } finally { btnRun.disabled = false; }
+});
+
+function renderResult(data, file) {
+  // 文本
+  $('resultText').value = data.text || '(未识别到文字)';
+  $('resultBox').classList.remove('hidden');
+  // 坐标列表
+  const list = data.lines || [];
+  const boxList = $('boxList');
+  boxList.innerHTML = '';
+  if (list.length) {
+    list.forEach((line, i) => {
+      const div = document.createElement('div');
+      div.className = 'box-item';
+      div.innerHTML = `<span class="t">${i+1}. ${escapeHtml(line.text)}</span> <span class="c">conf=${line.confidence}</span><br><small>box: ${JSON.stringify(line.box)}</small>`;
+      boxList.appendChild(div);
+    });
+    boxList.classList.remove('hidden');
+  } else boxList.classList.add('hidden');
+  // 画文字框
+  drawBoxes(file, list);
+  $('metaBox').classList.remove('hidden');
+  $('metaBox').textContent = `共 ${list.length} 个文字块 · request_id=${(window._rid||'')}`;
+}
+
+function clearResult() {
+  $('resultBox').classList.add('hidden');
+  $('boxList').classList.add('hidden');
+  $('canvasWrap').classList.add('hidden');
+  $('metaBox').classList.add('hidden');
+}
+
+function drawBoxes(file, lines) {
+  const canvas = $('boxCanvas'), wrap = $('canvasWrap');
+  if (!lines || !lines.length) { wrap.classList.add('hidden'); return; }
+  const img = new Image();
+  img.onload = () => {
+    const w = 640, scale = w / img.width, h = Math.round(img.height * scale);
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, w, h);
+    ctx.strokeStyle = '#22d3ee'; ctx.lineWidth = 2;
+    ctx.fillStyle = 'rgba(34,211,238,.85)'; ctx.font = '14px sans-serif';
+    lines.forEach((line, i) => {
+      const pts = line.box || [];
+      if (pts.length >= 4) {
+        ctx.beginPath();
+        ctx.moveTo(pts[0][0]*scale, pts[0][1]*scale);
+        for (let k=1;k<pts.length;k++) ctx.lineTo(pts[k][0]*scale, pts[k][1]*scale);
+        ctx.closePath(); ctx.stroke();
+      }
+      if (pts.length >= 1) ctx.fillText(String(i+1), pts[0][0]*scale+4, pts[0][1]*scale+16);
+    });
+    wrap.classList.remove('hidden');
+  };
+  img.src = URL.createObjectURL(file);
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
