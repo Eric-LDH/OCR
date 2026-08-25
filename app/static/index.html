@@ -124,6 +124,8 @@ btnRun.addEventListener('click', async () => {
 });
 
 function renderResult(data, file) {
+  // 识别成功，更新状态
+  setStatus('识别完成', 'ok');
   // 文本
   $('resultText').value = data.text || '(未识别到文字)';
   $('resultBox').classList.remove('hidden');
